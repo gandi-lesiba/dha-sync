@@ -1,0 +1,34 @@
+# All Python dependencies for the backend
+
+#Core Framework
+
+Flask==3.1.1
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.1.0
+Flask-JWT-Extended==4.7.1
+Flask-mail==0.9.1
+Flask-Cors==6.0.1
+python-dotenv==1.1.1
+pyodbc==5.2.0
+bcrypt==4.3.0
+Werkzeug==3.1.3
+
+# Database
+psycopg2-binary==2.9.9 # For PostgreSQL
+pymysql==1.1.0 # For MySQL
+
+# Utilities
+python-dotenv==1.1.1
+Werkzeug==3.1.3
+Jinja2==3.1.2
+MarkupSafe==2.1.1
+itsdangerous==2.2.0
+click==8.1.3
+
+# Testing
+pytest==7.4.2
+pytest-cov==4.1.0
+coverage==7.3.2
+
+# Production
+gunicorn==21.2.0
