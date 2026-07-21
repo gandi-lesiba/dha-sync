@@ -2,6 +2,7 @@
 # Application Factory - creates and configures the Flask app.
 
 import os
+from dotenv import load_dotenv
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -9,7 +10,6 @@ from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail
-from dotenv import load_dotenv
 from datetime import timedelta
 import logging
 from logging.handlers import RotatingFileHandler
@@ -45,7 +45,7 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     # JWT
-    app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key')
+    app.config['JWT_SECRET_KEY'] = 'your-super-secret-key-12345'
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=8)
     app.config['JWT_TOKEN_LOCATION'] = ['headers']
     app.config['JWT_HEADER_NAME'] = 'Authorization'
@@ -81,9 +81,20 @@ def create_app():
     app.logger.setLevel(logging.INFO)
     app.logger.info('DHA-Sync application started.')
 
-      # --- Blueprints ---
+        # --- Blueprints ---
     from app.routes.auth import auth_bp
+    from app.routes.cases import cases_bp
+    from app.routes.dashboard import dashboard_bp
+    from app.routes.documents import documents_bp
+    from app.routes.audit import audit_bp
+    from app.routes.users import users_bp
+
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    app.register_blueprint(cases_bp, url_prefix='/api/cases')
+    app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
+    app.register_blueprint(documents_bp, url_prefix='/api/documents')
+    app.register_blueprint(audit_bp, url_prefix='/api/audit')
+    app.register_blueprint(users_bp, url_prefix='/api/users')
 
       # --- Error Handlers ---
     @app.errorhandler(404)
