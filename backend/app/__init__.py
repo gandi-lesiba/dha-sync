@@ -31,6 +31,7 @@ def create_app():
     
     # Create Flask instance
     app = Flask(__name__)
+    app.url_map.strict_slashes = False
 
     # Database with absolute path
     basedir = os.path.abspath(os.path.dirname(__file__))  
@@ -59,8 +60,20 @@ def create_app():
     app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
     app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME')
 
-    # CORS
-    cors.init_app(app, origins=[os.environ.get('FRONTEND_URL', 'http://localhost:5173')])
+        # CORS
+    cors.init_app(
+        app,
+        origins=[
+            'http://localhost:5173',
+            'http://localhost:5174',
+            'http://localhost:3000',
+            'http://127.0.0.1:5173',
+            'http://127.0.0.1:5174'
+        ],
+        supports_credentials=True,
+        allow_headers=['Content-Type', 'Authorization'],
+        methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    )
 
     # Initialize extensions with app
     db.init_app(app)
