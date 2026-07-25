@@ -6,6 +6,7 @@
 [![Vite](https://img.shields.io/badge/Vite-5-purple)](https://vitejs.dev)
 [![Tailwind](https://img.shields.io/badge/Tailwind-3.4-teal)](https://tailwindcss.com)
 [![SQLite](https://img.shields.io/badge/SQLite-3-blue)](https://sqlite.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 A full-stack web application that digitises immigration and asylum case management for the
 Department of Home Affairs (DHA). It replaces paper-based, fragmented processes with a single
@@ -267,3 +268,11 @@ Exercises the authentication flow and the main case endpoints against a running 
   paths held in the database.
 - The audit log is append-only by design — the application never issues `UPDATE` or `DELETE`
   against it.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE).
+
+Copyright (c) 2026 Gandi Lesiba Mmatli
