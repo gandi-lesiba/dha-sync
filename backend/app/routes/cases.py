@@ -164,6 +164,21 @@ def create_case(user):
         except ValueError:
             return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
 
+    # Parse statutory deadline (optional)
+    statutory_deadline = None
+    if data.get("statutory_deadline"):
+        try:
+            statutory_deadline = datetime.strptime(data["statutory_deadline"], "%Y-%m-%d").date()
+        except ValueError:
+            return jsonify({"error": "Invalid statutory_deadline format. Use YYYY-MM-DD"}), 400
+
+    # Assigned officer is an optional FK — treat "" the same as not provided.
+    # An officer registering a case defaults to being assigned to their own
+    # case, otherwise they'd immediately get a 403 viewing what they just created.
+    assigned_officer_id = data.get("assigned_officer_id") or None
+    if not assigned_officer_id and user.role == "Officer":
+        assigned_officer_id = user.id
+
     new_case = Case(
         case_number=case_number,
         reference_number=data.get("reference_number"),
@@ -179,9 +194,9 @@ def create_case(user):
         case_type=data.get("case_type"),
         sub_type=data.get("sub_type"),
         priority=data.get("priority", "Normal"),
-        assigned_officer_id=data.get("assigned_officer_id"),
+        assigned_officer_id=assigned_officer_id,
         created_by_id=user.id,
-        statutory_deadline=data.get("statutory_deadline")
+        statutory_deadline=statutory_deadline
     )
     db.session.add(new_case)
     db.session.commit()
@@ -205,10 +220,23 @@ def update_case(user, case_id):
     allowed = ["status", "priority", "assigned_officer_id", "decision_date"]
     for field in allowed:
         if field in data:
-            old_val = getattr(case, field)
             new_val = data[field]
+            if field == "assigned_officer_id":
+                new_val = new_val or None
+            elif field == "decision_date" and new_val:
+                try:
+                    new_val = datetime.strptime(new_val, "%Y-%m-%d").date()
+                except ValueError:
+                    return jsonify({"error": "Invalid decision_date format. Use YYYY-MM-DD"}), 400
+            elif field == "decision_date":
+                new_val = None
+
+            old_val = getattr(case, field)
             if old_val != new_val:
-                changes[field] = {"old": old_val, "new": new_val}
+                changes[field] = {
+                    "old": old_val.isoformat() if hasattr(old_val, "isoformat") else old_val,
+                    "new": new_val.isoformat() if hasattr(new_val, "isoformat") else new_val,
+                }
                 setattr(case, field, new_val)
 
     if "status" in data and data["status"] in ["Approved", "Rejected"]:

@@ -1,67 +1,76 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import api from '../api';
+import {
+  clearTokens,
+  getAccessToken,
+  setAccessToken,
+  setRememberMe,
+  getActiveStorage,
+} from '../utils/tokenStore';
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // On first load, check if we have a token
   useEffect(() => {
-    // Check localStorage on app load
-    const token = localStorage.getItem('access_token');
-    const storedUser = localStorage.getItem('user');
-    
-    console.log('AuthProvider - token found:', !!token);
-    console.log('AuthProvider - storedUser found:', !!storedUser);
-    
+    const token = getAccessToken();
+    const storedUser = getActiveStorage().getItem('user');
+
     if (token && storedUser) {
       try {
-        const userData = JSON.parse(storedUser);
-        setUser(userData);
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        console.log('AuthProvider - user restored:', userData);
+        const parsedUser = JSON.parse(storedUser);
+        setUser({ ...parsedUser, role: parsedUser.role?.toLowerCase() });
       } catch (e) {
-        console.error('AuthProvider - error restoring user:', e);
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('user');
+        clearTokens();
       }
     }
     setLoading(false);
   }, []);
 
-const login = async (username, password) => {
-  try {
-    const response = await api.post('/auth/login', { username, password });
-    console.log('✅ AuthContext - login response:', response.data);
-    const { access_token, user: userData } = response.data;
-    
-    localStorage.setItem('access_token', access_token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-    setUser(userData);
-    
-    return { success: true };   //  MUST return { success: true }
-  } catch (error) {
-    console.error('❌ AuthContext - login error:', error.response?.data || error.message);
-    return { success: false, error: error.response?.data?.error || 'Login failed' };
-  }
-};
+  // Login function - matches our backend
+  const login = async (username, password, remember = true) => {
+    try {
+      const response = await api.post('/auth/login', { username, password });
+      const { access_token, user: userData } = response.data;
+      const normalizedUser = { ...userData, role: userData.role?.toLowerCase() };
 
+      setRememberMe(remember);
+      setAccessToken(access_token);
+      getActiveStorage().setItem('user', JSON.stringify(normalizedUser));
+      setUser(normalizedUser);
+
+      return { success: true };
+    } catch (error) {
+      console.error('Login error:', error.response?.data || error.message);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Login failed'
+      };
+    }
+  };
+
+  // Logout function
   const logout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user');
-    delete api.defaults.headers.common['Authorization'];
+    clearTokens();
     setUser(null);
   };
 
-  return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = {
+    user,
+    loading,
+    login,
+    logout,
+    isAuthenticated: !!user
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
-  return useContext(AuthContext);
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+  return ctx;
 }

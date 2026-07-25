@@ -4,21 +4,36 @@
 from flask import request, jsonify, Blueprint
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
-from app.models import AuditLog
+from app.models import AuditLog, User
 
 audit_bp = Blueprint("audit", __name__)
 
 
 def role_required(allowed_roles):
+    """
+    Decorator to check if user has required role.
+    Fetches user from database using string identity (user ID).
+    """
     from functools import wraps
     def decorator(fn):
         @wraps(fn)
         @jwt_required()
         def wrapper(*args, **kwargs):
-            current_user = get_jwt_identity()
-            if current_user["role"] not in allowed_roles:
+            # get_jwt_identity() now returns a string (user ID)
+            user_id_str = get_jwt_identity()
+            try:
+                user_id = int(user_id_str)
+            except ValueError:
+                return jsonify({"error": "Invalid user identity"}), 401
+
+            user = User.query.get(user_id)
+            if not user:
+                return jsonify({"error": "User not found"}), 404
+
+            if user.role not in allowed_roles:
                 return jsonify({"error": "Insufficient permissions"}), 403
-            return fn(current_user, *args, **kwargs)
+
+            return fn(user, *args, **kwargs)
         return wrapper
     return decorator
 

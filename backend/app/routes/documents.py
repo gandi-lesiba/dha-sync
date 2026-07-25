@@ -2,9 +2,9 @@
 # Document upload and management
 
 from flask import request, jsonify, Blueprint, current_app
-from flask_jwt_extended import jwt_required, get_jwt_identity  
-from app import db  
-from app.models import Document, Case, AuditLog  
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from app import db
+from app.models import Document, Case, AuditLog, User
 from werkzeug.utils import secure_filename
 import os
 import json
@@ -36,23 +36,65 @@ def log_audit(user_id, case_id, action, table_name, record_id, old_val, new_val)
 
 
 def role_required(allowed_roles):
+    """
+    Decorator to check if user has required role.
+    Fetches user from database using string identity (user ID).
+    """
     from functools import wraps
     def decorator(fn):
         @wraps(fn)
         @jwt_required()
         def wrapper(*args, **kwargs):
-            current_user = get_jwt_identity()
-            if current_user["role"] not in allowed_roles:
+            # get_jwt_identity() now returns a string (user ID)
+            user_id_str = get_jwt_identity()
+            try:
+                user_id = int(user_id_str)
+            except ValueError:
+                return jsonify({"error": "Invalid user identity"}), 401
+
+            user = User.query.get(user_id)
+            if not user:
+                return jsonify({"error": "User not found"}), 404
+
+            if user.role not in allowed_roles:
                 return jsonify({"error": "Insufficient permissions"}), 403
-            return fn(current_user, *args, **kwargs)
+
+            return fn(user, *args, **kwargs)
         return wrapper
     return decorator
 
 
+@documents_bp.route("/", methods=["GET"])
+@role_required(["Admin", "Supervisor", "Officer", "Auditor", "BorderOfficial"])
+def list_documents(user):
+    """List documents, optionally filtered by case_id or document_type."""
+    query = Document.query.join(Case, Document.case_id == Case.id)
+
+    if user.role == "Officer":
+        query = query.filter(Case.assigned_officer_id == user.id)
+
+    case_id = request.args.get("case_id")
+    if case_id:
+        query = query.filter(Document.case_id == case_id)
+
+    document_type = request.args.get("document_type")
+    if document_type:
+        query = query.filter(Document.document_type == document_type)
+
+    docs = query.order_by(Document.uploaded_at.desc()).limit(200).all()
+    result = []
+    for doc in docs:
+        d = doc.to_dict()
+        d["case_number"] = doc.case.case_number
+        d["applicant_full_name"] = doc.case.applicant_full_name
+        result.append(d)
+    return jsonify(result), 200
+
+
 @documents_bp.route("/upload", methods=["POST"])
 @role_required(["Admin", "Supervisor", "Officer"])
-def upload_document(current_user):
-    """Upload a document for a case.""" 
+def upload_document(user):
+    """Upload a document for a case."""
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
 
@@ -63,9 +105,9 @@ def upload_document(current_user):
         return jsonify({"error": "File type not allowed"}), 400
 
     case_id = request.form.get("case_id")
-    document_type = request.form.get("document_type", "Other")  # added this line
+    document_type = request.form.get("document_type", "Other")
 
-    if not case_id:  # FIXED: was checking "case" instead of "case_id"
+    if not case_id:
         return jsonify({"error": "case_id required"}), 400
 
     # Verify case exists
@@ -80,56 +122,56 @@ def upload_document(current_user):
     # Save file
     original_filename = secure_filename(file.filename)
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    filename = f"{timestamp}_{original_filename}"  # removed extra space
+    filename = f"{timestamp}_{original_filename}"
     file_path = os.path.join(upload_dir, filename)
     file.save(file_path)
 
     # Create document record
     doc = Document(
         case_id=case_id,
-        uploaded_by_id=current_user["id"],
+        uploaded_by_id=user.id,
         file_name=original_filename,
         file_path=file_path,
-        file_size=os.path.getsize(file_path),  # FIXED: getsisze → getsize
+        file_size=os.path.getsize(file_path),
         file_type=file.content_type,
-        document_type=document_type  # FIXED: now defined
+        document_type=document_type
     )
     db.session.add(doc)
-    db.session.commit()  # FIXED: sessiom → session
+    db.session.commit()
 
-    log_audit(current_user["id"], case_id, "UPLOAD_DOCUMENT", "documents", doc.id,
-              None, {"file_name": original_filename, "document_type": document_type}) 
+    log_audit(user.id, case_id, "UPLOAD_DOCUMENT", "documents", doc.id,
+              None, {"file_name": original_filename, "document_type": document_type})
 
     return jsonify({"message": "Document uploaded", "document_id": doc.id}), 201
 
 
-@documents_bp.route("/case/<int:case_id>", methods=["GET"]) 
+@documents_bp.route("/case/<int:case_id>", methods=["GET"])
 @role_required(["Admin", "Supervisor", "Officer", "Auditor", "BorderOfficial"])
-def get_case_documents(current_user, case_id):
+def get_case_documents(user, case_id):
     """Get all documents for a case."""
     case = Case.query.get_or_404(case_id)
-    if current_user["role"] == "Officer" and case.assigned_officer_id != current_user["id"]:
+    if user.role == "Officer" and case.assigned_officer_id != user.id:
         return jsonify({"error": "Access denied"}), 403
 
-    docs = Document.query.filter_by(case_id=case_id).order_by(Document.uploaded_at.desc()).all()  # FIXED: upload_at → uploaded_at
+    docs = Document.query.filter_by(case_id=case_id).order_by(Document.uploaded_at.desc()).all()
     return jsonify([doc.to_dict() for doc in docs]), 200
 
 
 @documents_bp.route("/<int:document_id>", methods=["DELETE"])
 @role_required(["Admin", "Supervisor", "Officer"])
-def delete_document(current_user, document_id):
+def delete_document(user, document_id):
     """Delete a document."""
     doc = Document.query.get_or_404(document_id)
 
-    if current_user["role"] == "Officer" and doc.uploaded_by_id != current_user["id"]:
-        return jsonify({"error": "Cannot delete other users' documents"}), 403  # FIXED: removed escaped quotes
+    if user.role == "Officer" and doc.uploaded_by_id != user.id:
+        return jsonify({"error": "Cannot delete other users' documents"}), 403
 
     # Delete file from disk
     if os.path.exists(doc.file_path):
         os.remove(doc.file_path)
 
     case_id = doc.case_id
-    log_audit(current_user["id"], case_id, "DELETE_DOCUMENT", "documents", doc.id,
+    log_audit(user.id, case_id, "DELETE_DOCUMENT", "documents", doc.id,
               {"file_name": doc.file_name}, None)
     db.session.delete(doc)
     db.session.commit()

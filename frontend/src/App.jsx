@@ -1,64 +1,114 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import Layout from './components/Layout';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import NewCase from './pages/NewCase';
-import CaseDetail from './pages/CaseDetail';
+import { Routes, Route } from "react-router-dom";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import NewCase from "./pages/NewCase";
+import CaseDetail from "./pages/CaseDetail";
+import CasesList from "./pages/CasesList";
+import DocumentsList from "./pages/DocumentsList";
+import UsersManagement from "./pages/UsersManagement";
+import AuditLogPage from "./pages/AuditLogPage";
+import SettingsPage from "./pages/SettingsPage";
+import SupervisorDashboard from "./pages/SupervisorDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
+import DeportationBoard from "./pages/DeportationBoard";
+import Reports from "./pages/Reports";
+import { useAuth } from "./context/AuthContext";
 
-function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth();
-  const location = useLocation();
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-dha-blue-600"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  return children;
+/** Sends each role to its own landing dashboard on "/" — matches the three
+ * separate dashboard wireframes in DESIGN.docx rather than one shared page. */
+function RoleHome() {
+  const { user } = useAuth();
+  if (user?.role === "supervisor") return <SupervisorDashboard />;
+  if (user?.role === "admin") return <AdminDashboard />;
+  return <Dashboard />;
 }
 
-function AppRoutes() {
+export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/dashboard" element={
-        <ProtectedRoute>
-          <Layout><Dashboard /></Layout>
-        </ProtectedRoute>
-      } />
-      <Route path="/cases/new" element={
-        <ProtectedRoute>
-          <Layout><NewCase /></Layout>
-        </ProtectedRoute>
-      } />
-      <Route path="/cases/:id" element={
-        <ProtectedRoute>
-          <Layout><CaseDetail /></Layout>
-        </ProtectedRoute>
-      } />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute roles={["officer", "supervisor", "admin"]}>
+            <RoleHome />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cases"
+        element={
+          <ProtectedRoute roles={["officer", "supervisor", "admin"]}>
+            <CasesList />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cases/new"
+        element={
+          <ProtectedRoute roles={["officer", "supervisor", "admin"]}>
+            <NewCase />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cases/:id"
+        element={
+          <ProtectedRoute roles={["officer", "supervisor", "admin"]}>
+            <CaseDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/documents"
+        element={
+          <ProtectedRoute roles={["officer", "supervisor", "admin"]}>
+            <DocumentsList />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/deportation"
+        element={
+          <ProtectedRoute roles={["supervisor", "admin"]}>
+            <DeportationBoard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reports"
+        element={
+          <ProtectedRoute roles={["supervisor", "admin"]}>
+            <Reports />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute roles={["admin"]}>
+            <UsersManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/audit"
+        element={
+          <ProtectedRoute roles={["admin"]}>
+            <AuditLogPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute roles={["admin"]}>
+            <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }
-
-function App() {
-  return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
-  );
-}
-
-export default App;

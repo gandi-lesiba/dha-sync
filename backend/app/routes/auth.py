@@ -114,8 +114,8 @@ def login():
 @auth_bp.route('/me', methods=['GET'])
 @jwt_required()
 def get_current_user():
-    current_user = get_jwt_identity()
-    user = User.query.get(current_user['id'])
+    user_id = get_jwt_identity()
+    user = User.query.get(int(user_id))
     if not user:
         return jsonify({'error': 'User not found'}), 404
     return jsonify(user.to_dict()), 200
@@ -123,8 +123,8 @@ def get_current_user():
 @auth_bp.route('/logout', methods=['POST'])
 @jwt_required()
 def logout():
-    current_user = get_jwt_identity()
-    user = User.query.get(current_user['id'])
+    user_id = get_jwt_identity()
+    user = User.query.get(int(user_id))
     if user:
         log_audit(user.id, 'LOGOUT', 'users', user.id, None, f'User {user.username} logged out')
     return jsonify({'message': 'Logout successful'}), 200

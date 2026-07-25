@@ -83,7 +83,7 @@ export default function CaseDetail() {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">Case not found</p>
-        <Link to="/dashboard" className="text-dha-blue-600 hover:underline">Return to Dashboard</Link>
+        <Link to="/" className="text-dha-blue-600 hover:underline">Return to Dashboard</Link>
       </div>
     );
   }
@@ -105,7 +105,7 @@ export default function CaseDetail() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <Link to="/dashboard" className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4">
+      <Link to="/" className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4">
         <ArrowLeftIcon className="w-4 h-4 mr-1" />
         Back to Dashboard
       </Link>
