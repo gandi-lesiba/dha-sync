@@ -35,7 +35,11 @@ export default function UsersManagement() {
       await api.put(`/users/${id}`, changes);
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...changes } : u)));
     } catch (err) {
-      window.alert('Failed to update user.');
+      // The API rejects demoting/deactivating the last Admin — show why, and
+      // refetch so the row reflects the server's actual state, not the
+      // value the dropdown optimistically moved to.
+      window.alert(err.response?.data?.error || 'Failed to update user.');
+      fetchUsers();
     } finally {
       setSavingId(null);
     }

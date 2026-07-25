@@ -33,12 +33,34 @@ const NAV_BY_ROLE = {
     { to: "/audit", label: "Audit Log", icon: ClipboardList },
     { to: "/settings", label: "Settings", icon: Settings },
   ],
+  // Read-only roles — nav mirrors what the API actually lets them GET.
+  auditor: [
+    { to: "/", label: "Dashboard", icon: LayoutDashboard },
+    { to: "/cases", label: "Cases", icon: Folder },
+    { to: "/documents", label: "Documents", icon: FileText },
+    { to: "/reports", label: "Reports", icon: BarChart3 },
+    { to: "/audit", label: "Audit Log", icon: ClipboardList },
+  ],
+  borderofficial: [
+    { to: "/", label: "Cases", icon: Folder },
+    { to: "/documents", label: "Documents", icon: FileText },
+  ],
 };
 
-const ROLE_LABEL = { officer: "Case Officer", supervisor: "Supervisor", admin: "Administrator" };
+const ROLE_LABEL = {
+  officer: "Case Officer",
+  supervisor: "Supervisor",
+  admin: "Administrator",
+  auditor: "Auditor",
+  borderofficial: "Border Official",
+};
 
 const PAGE_SUBTITLE_BY_PATH = [
-  { test: (p) => p === "/", label: (role) => `${ROLE_LABEL[role] || ""} Dashboard` },
+  {
+    test: (p) => p === "/",
+    label: (role) =>
+      role === "borderofficial" ? "Case Verification" : `${ROLE_LABEL[role] || ""} Dashboard`,
+  },
   { test: (p) => p === "/cases", label: () => "Cases" },
   { test: (p) => /^\/cases\/new$/.test(p), label: () => "Register New Case" },
   { test: (p) => /^\/cases\/\d+/.test(p), label: () => "Case Detail" },

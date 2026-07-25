@@ -69,10 +69,31 @@ def update_user(user, user_id):
         target_user.full_name = data["full_name"]
 
     if "role" in data and data["role"] != target_user.role:
+        # Guard against locking the system out of its own admin functions:
+        # demoting the last Admin leaves nobody able to restore it, since
+        # this very endpoint is Admin-only.
+        if target_user.role == "Admin" and data["role"] != "Admin":
+            remaining_admins = User.query.filter(
+                User.role == "Admin", User.id != target_user.id
+            ).count()
+            if remaining_admins == 0:
+                return jsonify({
+                    "error": "Cannot change the role of the last remaining Admin. "
+                             "Promote another user to Admin first."
+                }), 409
         changes["role"] = {"old": target_user.role, "new": data["role"]}
         target_user.role = data["role"]
 
     if "is_active" in data and data["is_active"] != target_user.is_active:
+        # Same reasoning: deactivating the last Admin is an equivalent lockout.
+        if target_user.role == "Admin" and not data["is_active"]:
+            remaining_admins = User.query.filter(
+                User.role == "Admin", User.id != target_user.id, User.is_active.is_(True)
+            ).count()
+            if remaining_admins == 0:
+                return jsonify({
+                    "error": "Cannot deactivate the last remaining active Admin."
+                }), 409
         changes["is_active"] = {"old": target_user.is_active, "new": data["is_active"]}
         target_user.is_active = data["is_active"]
 

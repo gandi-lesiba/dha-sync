@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api';
+import { useAuth } from '../../context/AuthContext';
+import { canWrite } from '../../utils/permissions';
 import { DocumentIcon, ArrowUpTrayIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 const DOC_TYPES = ['Passport', 'Affidavit', 'Proof of Entry', 'Interview Notes', 'Other'];
@@ -12,6 +14,8 @@ function formatSize(bytes) {
 }
 
 export default function DocumentsTab({ caseId }) {
+  const { user } = useAuth();
+  const mayWrite = canWrite(user?.role);
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -73,25 +77,27 @@ export default function DocumentsTab({ caseId }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h3 className="font-medium text-gray-800">Documents ({docs.length})</h3>
-        <div className="flex items-center gap-2">
-          <select
-            value={docType}
-            onChange={(e) => setDocType(e.target.value)}
-            className="border border-gray-300 rounded-lg text-sm px-2 py-1.5 focus:ring-2 focus:ring-dha-blue-500 outline-none"
-          >
-            {DOC_TYPES.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="inline-flex items-center gap-1.5 bg-dha-blue-600 hover:bg-dha-blue-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition disabled:opacity-50"
-          >
-            <ArrowUpTrayIcon className="w-4 h-4" /> {uploading ? 'Uploading…' : 'Upload'}
-          </button>
-          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
-        </div>
+        {mayWrite && (
+          <div className="flex items-center gap-2">
+            <select
+              value={docType}
+              onChange={(e) => setDocType(e.target.value)}
+              className="border border-gray-300 rounded-lg text-sm px-2 py-1.5 focus:ring-2 focus:ring-dha-blue-500 outline-none"
+            >
+              {DOC_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex items-center gap-1.5 bg-dha-blue-600 hover:bg-dha-blue-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition disabled:opacity-50"
+            >
+              <ArrowUpTrayIcon className="w-4 h-4" /> {uploading ? 'Uploading…' : 'Upload'}
+            </button>
+            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
+          </div>
+        )}
       </div>
 
       {docs.length === 0 ? (
@@ -113,13 +119,15 @@ export default function DocumentsTab({ caseId }) {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => handleDelete(doc.id)}
-                className="text-gray-400 hover:text-red-600 flex-shrink-0"
-                aria-label="Delete document"
-              >
-                <TrashIcon className="w-4 h-4" />
-              </button>
+              {mayWrite && (
+                <button
+                  onClick={() => handleDelete(doc.id)}
+                  className="text-gray-400 hover:text-red-600 flex-shrink-0"
+                  aria-label="Delete document"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              )}
             </li>
           ))}
         </ul>

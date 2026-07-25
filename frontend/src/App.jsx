@@ -15,24 +15,33 @@ import DeportationBoard from "./pages/DeportationBoard";
 import Reports from "./pages/Reports";
 import { useAuth } from "./context/AuthContext";
 
-/** Sends each role to its own landing dashboard on "/" — matches the three
- * separate dashboard wireframes in DESIGN.docx rather than one shared page. */
+/** Sends each role to its own landing page on "/" — the three dashboard
+ * wireframes in DESIGN.docx, plus sensible landings for the two read-only
+ * roles. A border official only has case/document read access, so their
+ * home is the case list rather than a stats dashboard they can't load. */
 function RoleHome() {
   const { user } = useAuth();
   if (user?.role === "supervisor") return <SupervisorDashboard />;
   if (user?.role === "admin") return <AdminDashboard />;
+  if (user?.role === "borderofficial") return <CasesList />;
   return <Dashboard />;
 }
+
+// Read access to cases/documents — matches the backend's widest role list.
+const ALL_ROLES = ["officer", "supervisor", "admin", "auditor", "borderofficial"];
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
 
+      {/* "/" deliberately has no role restriction: it is the fallback every
+          other route redirects to, so restricting it can only ever produce a
+          redirect loop. RoleHome decides what each role actually sees. */}
       <Route
         path="/"
         element={
-          <ProtectedRoute roles={["officer", "supervisor", "admin"]}>
+          <ProtectedRoute>
             <RoleHome />
           </ProtectedRoute>
         }
@@ -40,7 +49,7 @@ export default function App() {
       <Route
         path="/cases"
         element={
-          <ProtectedRoute roles={["officer", "supervisor", "admin"]}>
+          <ProtectedRoute roles={ALL_ROLES}>
             <CasesList />
           </ProtectedRoute>
         }
@@ -56,7 +65,7 @@ export default function App() {
       <Route
         path="/cases/:id"
         element={
-          <ProtectedRoute roles={["officer", "supervisor", "admin"]}>
+          <ProtectedRoute roles={ALL_ROLES}>
             <CaseDetail />
           </ProtectedRoute>
         }
@@ -64,7 +73,7 @@ export default function App() {
       <Route
         path="/documents"
         element={
-          <ProtectedRoute roles={["officer", "supervisor", "admin"]}>
+          <ProtectedRoute roles={ALL_ROLES}>
             <DocumentsList />
           </ProtectedRoute>
         }
@@ -80,7 +89,7 @@ export default function App() {
       <Route
         path="/reports"
         element={
-          <ProtectedRoute roles={["supervisor", "admin"]}>
+          <ProtectedRoute roles={["supervisor", "admin", "auditor"]}>
             <Reports />
           </ProtectedRoute>
         }
@@ -96,7 +105,7 @@ export default function App() {
       <Route
         path="/audit"
         element={
-          <ProtectedRoute roles={["admin"]}>
+          <ProtectedRoute roles={["admin", "supervisor", "auditor"]}>
             <AuditLogPage />
           </ProtectedRoute>
         }

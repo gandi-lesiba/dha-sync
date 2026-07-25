@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { canWrite } from '../utils/permissions';
 import api from '../api';
 import {
   ArrowLeftIcon,
@@ -36,6 +37,7 @@ const statusColors = {
 export default function CaseDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const mayWrite = canWrite(user?.role);
   const [caseData, setCaseData] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
@@ -124,15 +126,17 @@ export default function CaseDetail() {
               {caseData.case_type} • {caseData.applicant_full_name} • {caseData.nationality}
             </p>
           </div>
-          <div className="mt-3 md:mt-0 flex items-center space-x-2">
-            <button
-              onClick={() => setShowStatusUpdate(!showStatusUpdate)}
-              className="inline-flex items-center px-3 py-2 text-sm bg-dha-blue-600 text-white rounded-lg hover:bg-dha-blue-700 transition"
-            >
-              <PencilSquareIcon className="w-4 h-4 mr-1" />
-              Update Status
-            </button>
-          </div>
+          {mayWrite && (
+            <div className="mt-3 md:mt-0 flex items-center space-x-2">
+              <button
+                onClick={() => setShowStatusUpdate(!showStatusUpdate)}
+                className="inline-flex items-center px-3 py-2 text-sm bg-dha-blue-600 text-white rounded-lg hover:bg-dha-blue-700 transition"
+              >
+                <PencilSquareIcon className="w-4 h-4 mr-1" />
+                Update Status
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Quick Stats */}
@@ -159,7 +163,7 @@ export default function CaseDetail() {
       </div>
 
       {/* Status Update Panel */}
-      {showStatusUpdate && (
+      {mayWrite && showStatusUpdate && (
         <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-6">
           <div className="flex items-center justify-between">
             <h3 className="font-medium text-gray-800">Update Case Status</h3>

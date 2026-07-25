@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
+import { useAuth } from '../context/AuthContext';
+import { canWrite } from '../utils/permissions';
 import { MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
 
 const STATUS_COLORS = {
@@ -15,6 +17,8 @@ const STATUS_COLORS = {
 const STATUS_OPTIONS = ['Pending', 'Under Review', 'Interview Scheduled', 'Appeals', 'Approved', 'Rejected'];
 
 export default function CasesList() {
+  const { user } = useAuth();
+  const mayWrite = canWrite(user?.role);
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,12 +58,14 @@ export default function CasesList() {
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Cases</h1>
           <p className="text-gray-600 mt-1">{total} case{total === 1 ? '' : 's'} in view</p>
         </div>
-        <Link
-          to="/cases/new"
-          className="inline-flex items-center gap-1.5 bg-dha-blue-600 hover:bg-dha-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-md transition"
-        >
-          <PlusIcon className="w-4 h-4" /> Register New Case
-        </Link>
+        {mayWrite && (
+          <Link
+            to="/cases/new"
+            className="inline-flex items-center gap-1.5 bg-dha-blue-600 hover:bg-dha-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-md transition"
+          >
+            <PlusIcon className="w-4 h-4" /> Register New Case
+          </Link>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4 flex flex-wrap gap-3">

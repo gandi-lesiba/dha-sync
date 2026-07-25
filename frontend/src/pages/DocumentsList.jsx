@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
+import { useAuth } from '../context/AuthContext';
+import { canWrite } from '../utils/permissions';
 import { DocumentIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 function formatSize(bytes) {
@@ -11,6 +13,8 @@ function formatSize(bytes) {
 }
 
 export default function DocumentsList() {
+  const { user } = useAuth();
+  const mayWrite = canWrite(user?.role);
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -98,14 +102,16 @@ export default function DocumentsList() {
                       {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleString() : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => handleDelete(doc.id)}
-                        disabled={deletingId === doc.id}
-                        className="text-gray-400 hover:text-red-600 disabled:opacity-50"
-                        aria-label="Delete document"
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                      </button>
+                      {mayWrite && (
+                        <button
+                          onClick={() => handleDelete(doc.id)}
+                          disabled={deletingId === doc.id}
+                          className="text-gray-400 hover:text-red-600 disabled:opacity-50"
+                          aria-label="Delete document"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
