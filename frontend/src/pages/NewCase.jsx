@@ -45,12 +45,22 @@ export default function NewCase() {
         // Step 2
         case_type: "",
         sub_type: "",
+        reference_number: "",
         priority: "Normal",
         assigned_officer_id: "",
         statutory_deadline: "",  // ✅ Added missing field
         // Step 3
         documents: []
     });
+    const [submitError, setSubmitError] = useState(null);
+
+    // Which wizard step contains a given backend field, so a validation
+    // error on submit can send the user back to fix it rather than leaving
+    // them stuck on the review step with no obvious way to correct it.
+    const FIELD_STEP = {
+        applicant_full_name: 1, passport_number: 1, nationality: 1, date_of_birth: 1,
+        case_type: 2, reference_number: 2,
+    };
 
     // ✅ All these functions are now INSIDE the component
     const updateFormData = (data) => {
@@ -69,6 +79,7 @@ export default function NewCase() {
 
     const handleSubmit = async () => {
         setLoading(true);
+        setSubmitError(null);
         try {
             // Create case
             const response = await api.post("/cases", {
@@ -91,7 +102,12 @@ export default function NewCase() {
             navigate(`/cases/${caseId}`);
         } catch (error) {
             console.error("Failed to create case:", error);
-            alert("Failed to create case. Please try again.");
+            const data = error.response?.data;
+            setSubmitError(data?.error || "Failed to create case. Please try again.");
+            if (data?.field && FIELD_STEP[data.field]) {
+                setCurrentStep(FIELD_STEP[data.field]);
+                window.scrollTo(0, 0);
+            }
         } finally {
             setLoading(false);
         }
@@ -119,6 +135,12 @@ export default function NewCase() {
                 <h1 className="text-2xl font-bold text-gray-900">New Case Registration</h1>  {/* ✅ Fixed: 2x1 → 2xl */}
                 <p className="text-sm text-gray-500">Complete all steps to register a new immigration case</p>
             </div>
+
+            {submitError && (
+                <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-700">{submitError}</p>
+                </div>
+            )}
 
             {/* Stepper */}
             <div className="mb-8">

@@ -7,7 +7,29 @@ from app import db
 from app.models import Case, User, AuditLog
 from datetime import datetime
 import json
+import re
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
+
+# Maps a SQLite UNIQUE-constraint column name to the request field the
+# duplicate value actually came from, so the 400 can name the field the
+# frontend needs to highlight rather than just repeating the DB error.
+UNIQUE_FIELD_ERRORS = {
+    "cases.case_number": ("case_number", "Case number already exists."),
+    "cases.reference_number": ("reference_number", "A case with this reference number already exists."),
+}
+
+
+def integrity_error_response(err):
+    """Translate a SQLite UNIQUE-constraint IntegrityError into a field-level 400."""
+    message = str(err.orig)
+    match = re.search(r"UNIQUE constraint failed: (\S+)", message)
+    column = match.group(1) if match else None
+    field, detail = UNIQUE_FIELD_ERRORS.get(column, (None, "A record with this value already exists."))
+    body = {"error": detail}
+    if field:
+        body["field"] = field
+    return jsonify(body), 400
 
 cases_bp = Blueprint("cases", __name__)
 
@@ -199,7 +221,11 @@ def create_case(user):
         statutory_deadline=statutory_deadline
     )
     db.session.add(new_case)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError as err:
+        db.session.rollback()
+        return integrity_error_response(err)
 
     log_audit(user.id, new_case.id, "CREATE_CASE", "cases", new_case.id,
               None, {"case_number": case_number, "applicant": new_case.applicant_full_name})

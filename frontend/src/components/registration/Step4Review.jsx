@@ -19,6 +19,7 @@ export default function Step4Review({ data }) {
             icon: DocumentTextIcon,
             fields: [
                 { label: "Case Type", value: data.case_type },
+                { label: "Reference Number", value: data.reference_number || "N/A" },
                 { label: "Sub Type", value: data.sub_type || "N/A" },
                 { label: "Priority", value: data.priority },
                 { label: "Statutory Deadline", value: data.statutory_deadline || "N/A" },
