@@ -268,6 +268,11 @@ Exercises the authentication flow and the main case endpoints against a running 
   paths held in the database.
 - The audit log is append-only by design — the application never issues `UPDATE` or `DELETE`
   against it.
+- `database/schema.sql` and `database/seed.sql` are a reference copy of the schema and demo
+  data, generated from the live database rather than hand-written. The application itself does
+  not read these files — `db.create_all()` and `backend/app/utils/seed.py` create the schema
+  and demo accounts in Python on first run. Running both files against a fresh SQLite database
+  independently reproduces the same six accounts and passwords listed above (verified).
 
 ---
 
