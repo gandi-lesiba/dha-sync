@@ -260,52 +260,7 @@ Exercises the authentication flow and the main case endpoints against a running 
 
 ---
 
-## Deployment
 
-Netlify hosts static sites and serverless functions — it cannot run the Flask backend, which is
-a stateful process with a SQL database and JWT sessions. Deploy the two halves separately:
-**Netlify for the frontend, Render for the backend.** The steps below assume Render; Railway or
-Fly.io work the same way in spirit if you prefer one of those instead.
-
-### 1. Backend → Render
-
-1. Push this repo to GitHub (already done if you're reading this from there).
-2. At [dashboard.render.com/blueprints](https://dashboard.render.com/blueprints), click **New
-   Blueprint Instance** and select this repo. Render reads `render.yaml` from the repo root and
-   proposes a web service plus a free Postgres database — review and create both.
-3. Render builds and deploys automatically. Once live, copy the service URL (something like
-   `https://dha-sync-api.onrender.com`).
-4. In the service's **Environment** tab, set `ALLOWED_ORIGINS` to your Netlify URL from step 2
-   below (you can add it after step 2, then it redeploys automatically).
-
-`SECRET_KEY` and `JWT_SECRET_KEY` are generated automatically by the Blueprint — never reuse the
-placeholder values from `.env.example`. `DATABASE_URL` is wired to the Postgres database
-automatically; the app switches from SQLite to Postgres based solely on whether this variable is
-set, no code change needed.
-
-> Free-tier notes: the web service spins down after ~15 minutes idle and takes 30–60s to wake on
-> the next request — the first login after inactivity will be slow, not broken. The free
-> Postgres database expires after 90 days.
-
-### 2. Frontend → Netlify
-
-1. At [app.netlify.com](https://app.netlify.com), **Add new site → Import an existing project**,
-   and select this repo. Netlify reads `netlify.toml` from the repo root and picks up the build
-   settings (`base: frontend`, `npm run build`, publish `dist`) automatically.
-2. Before the first deploy, go to **Site configuration → Environment variables** and add:
-   ```
-   VITE_API_URL = https://dha-sync-api.onrender.com/api
-   ```
-   (your actual Render URL from step 3 above, with `/api` appended — this is what `frontend/src/api.js` reads).
-3. Deploy. Netlify gives you a URL like `https://dha-sync.netlify.app`.
-4. Go back to Render and set `ALLOWED_ORIGINS` to that Netlify URL (step 4 above) — without this,
-   the browser blocks every API call with a CORS error even though the backend itself is up.
-
-### 3. Verify
-
-Open the Netlify URL, log in with a [demo account](#demo-accounts), and confirm the dashboard
-loads real data. If login fails with a network error, it's almost always `ALLOWED_ORIGINS` on
-Render not matching the Netlify URL exactly (including `https://`, no trailing slash).
 
 ---
 
