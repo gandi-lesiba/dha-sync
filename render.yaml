@@ -1,0 +1,48 @@
+# Render Blueprint for the Flask backend. Import this repo at
+# https://dashboard.render.com/blueprints -- Render reads this file and
+# proposes both resources below for you to review before creating them.
+#
+# Free-tier notes:
+# - The free Postgres database expires after 90 days and must be recreated
+#   (Render will email a warning first). Fine for an assessment submission;
+#   revisit before then for anything longer-lived.
+# - The free web service spins down after ~15 minutes of inactivity and
+#   takes ~30-60s to wake on the next request. The first login after a
+#   period of inactivity will be slow, not broken.
+#
+# Manual step after the first deploy: copy this service's URL and set
+# VITE_API_URL=<that-url>/api in Netlify's environment variables, then
+# ALLOWED_ORIGINS=<your-netlify-url> here (Render dashboard -> Environment).
+
+databases:
+  - name: dha-sync-db
+    plan: free
+    databaseName: dha_sync
+    user: dha_sync
+
+services:
+  - type: web
+    name: dha-sync-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn run:app
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dha-sync-db
+          property: connectionString
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false

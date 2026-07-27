@@ -1,0 +1,21 @@
+# Netlify deploys the frontend only. The Flask backend (backend/) is a
+# stateful Python app with a database and JWT sessions -- Netlify's
+# serverless/static model can't run it. Deploy the backend separately
+# (Render, Railway, Fly.io) and point VITE_API_URL at it.
+#
+# Required manual step: set VITE_API_URL in Netlify's dashboard
+# (Site configuration -> Environment variables) to your deployed backend's
+# URL plus /api, e.g. https://dha-sync-api.onrender.com/api
+
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "dist"
+
+# React Router uses client-side routing. Without this, refreshing on any
+# route other than "/" (e.g. /cases/3) returns Netlify's 404 page, because
+# there is no actual /cases/3 file to serve.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -33,20 +33,41 @@ def create_app():
     app = Flask(__name__)
     app.url_map.strict_slashes = False
 
-    # Database with absolute path
-    basedir = os.path.abspath(os.path.dirname(__file__))  
-    backend_dir = os.path.dirname(basedir)
-    instance_dir = os.path.join(backend_dir, "instance")
-    os.makedirs(instance_dir, exist_ok=True)
-    db_path = os.path.join(instance_dir, "dha_sync.db")
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+    # Database. DATABASE_URL (e.g. Render's managed Postgres connection
+    # string) takes priority so production doesn't fall back to a local
+    # SQLite file with no persistent disk; local dev with no DATABASE_URL
+    # set keeps using the SQLite file under backend/instance/.
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+        # SQLAlchemy 1.4+ dropped support for the "postgres://" scheme that
+        # Render (and Heroku before it) still hands out.
+        if database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql://", 1)
+        app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+    else:
+        basedir = os.path.abspath(os.path.dirname(__file__))
+        backend_dir = os.path.dirname(basedir)
+        instance_dir = os.path.join(backend_dir, "instance")
+        os.makedirs(instance_dir, exist_ok=True)
+        db_path = os.path.join(instance_dir, "dha_sync.db")
+        app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 
     # --- Configuration ---
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    # JWT
-    app.config['JWT_SECRET_KEY'] = 'your-super-secret-key-12345'
+    # JWT — must come from the environment. A hardcoded key here would be
+    # visible to anyone who reads this file on GitHub, letting them forge
+    # valid tokens for any deployed instance running this code.
+    jwt_secret = os.environ.get('JWT_SECRET_KEY')
+    if not jwt_secret:
+        if os.environ.get('RENDER') or os.environ.get('FLASK_ENV') == 'production':
+            raise RuntimeError(
+                'JWT_SECRET_KEY environment variable is required in production. '
+                'Set it in your hosting platform\'s dashboard -- do not hardcode it.'
+            )
+        jwt_secret = 'dev-only-jwt-secret-do-not-use-in-production'
+    app.config['JWT_SECRET_KEY'] = jwt_secret
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=8)
     app.config['JWT_TOKEN_LOCATION'] = ['headers']
     app.config['JWT_HEADER_NAME'] = 'Authorization'
@@ -60,16 +81,22 @@ def create_app():
     app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
     app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME')
 
-        # CORS
+        # CORS. ALLOWED_ORIGINS lets a deployed frontend (e.g. a Netlify URL)
+    # be added without editing source — comma-separated, e.g.
+    # "https://dha-sync.netlify.app,https://dha-sync-staging.netlify.app".
+    default_origins = [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:3000',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:5174',
+    ]
+    extra_origins = [
+        o.strip() for o in os.environ.get('ALLOWED_ORIGINS', '').split(',') if o.strip()
+    ]
     cors.init_app(
         app,
-        origins=[
-            'http://localhost:5173',
-            'http://localhost:5174',
-            'http://localhost:3000',
-            'http://127.0.0.1:5173',
-            'http://127.0.0.1:5174'
-        ],
+        origins=default_origins + extra_origins,
         supports_credentials=True,
         allow_headers=['Content-Type', 'Authorization'],
         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']

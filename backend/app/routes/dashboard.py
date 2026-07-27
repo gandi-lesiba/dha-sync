@@ -6,9 +6,26 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.models import Case, User, AuditLog
 from datetime import datetime, timedelta
-from sqlalchemy import func
+from sqlalchemy import func, case
+from collections import defaultdict
 
 dashboard_bp = Blueprint("dashboard", __name__)
+
+
+def average_processing_days(query):
+    """
+    Mean days between application_date and decision_date for a filtered
+    Case query. Computed in Python rather than SQL (e.g. julianday(),
+    which is SQLite-only and would raise on Postgres) so this works
+    identically across both database backends.
+    """
+    pairs = query.with_entities(Case.application_date, Case.decision_date).all()
+    diffs = [
+        (decision - application).days
+        for application, decision in pairs
+        if application and decision
+    ]
+    return round(sum(diffs) / len(diffs), 1) if diffs else 0
 
 
 def role_required(allowed_roles):
@@ -59,15 +76,10 @@ def get_stats(user):
     interview_scheduled = query.filter_by(status="Interview Scheduled").count()
 
     # Average processing days for completed cases
-    avg_days = db.session.query(func.avg(
-        func.julianday(Case.decision_date) - func.julianday(Case.application_date)
-    )).filter(Case.status.in_(["Approved", "Rejected"]))
-
+    completed_query = Case.query.filter(Case.status.in_(["Approved", "Rejected"]))
     if user.role == "Officer":
-        avg_days = avg_days.filter(Case.assigned_officer_id == user.id)
-
-    avg_days = avg_days.scalar()
-    avg_days = round(avg_days, 1) if avg_days else 0
+        completed_query = completed_query.filter_by(assigned_officer_id=user.id)
+    avg_days = average_processing_days(completed_query)
 
     # Overdue cases (past statutory deadline)
     overdue = Case.query.filter(
@@ -98,14 +110,24 @@ def get_monthly_data(user):
     months = int(request.args.get("months", 6))
     cutoff = datetime.utcnow() - timedelta(days=months * 30)
 
-    data = db.session.query(
-        func.strftime("%Y-%m", Case.created_at).label("month"),
-        func.count(Case.id).label("total"),
-        func.sum(Case.status == "Approved").label("approved"),
-        func.sum(Case.status == "Rejected").label("rejected")
-    ).filter(Case.created_at >= cutoff).group_by("month").order_by("month").all()
+    # Grouped in Python rather than via strftime() (SQLite-only, raises on
+    # Postgres) so this works identically across both database backends.
+    rows = Case.query.filter(Case.created_at >= cutoff).with_entities(
+        Case.created_at, Case.status
+    ).all()
 
-    result = [{"month": r.month, "total": r.total, "approved": r.approved or 0, "rejected": r.rejected or 0} for r in data]
+    buckets = defaultdict(lambda: {"total": 0, "approved": 0, "rejected": 0})
+    for created_at, status in rows:
+        key = created_at.strftime("%Y-%m")
+        buckets[key]["total"] += 1
+        if status == "Approved":
+            buckets[key]["approved"] += 1
+        elif status == "Rejected":
+            buckets[key]["rejected"] += 1
+
+    result = [
+        {"month": month, **counts} for month, counts in sorted(buckets.items())
+    ]
     return jsonify(result), 200
 
 
@@ -114,11 +136,14 @@ def get_monthly_data(user):
 def get_country_stats(user):
     """Country statistics."""
     limit = int(request.args.get("limit", 10))
+    # func.sum() on a raw boolean comparison works on SQLite (booleans are
+    # just 0/1 there) but raises "function sum(boolean) does not exist" on
+    # Postgres. case() produces an explicit 1/0 that both accept.
     data = db.session.query(
         Case.nationality,
         func.count(Case.id).label("total"),
-        func.sum(Case.status == "Approved").label("approved"),
-        func.sum(Case.status == "Rejected").label("rejected")
+        func.sum(case((Case.status == "Approved", 1), else_=0)).label("approved"),
+        func.sum(case((Case.status == "Rejected", 1), else_=0)).label("rejected")
     ).group_by(Case.nationality).order_by(func.count(Case.id).desc()).limit(limit).all()
 
     result = []
@@ -151,11 +176,9 @@ def get_officer_productivity(user):
         approved = cases.filter_by(status="Approved").count()
         rejected = cases.filter_by(status="Rejected").count()
         pending = cases.filter_by(status="Pending").count()
-        avg_days = db.session.query(func.avg(
-            func.julianday(Case.decision_date) - func.julianday(Case.application_date)
-        )).filter(Case.assigned_officer_id == officer.id,
-                  Case.status.in_(["Approved", "Rejected"])).scalar()
-        avg_days = round(avg_days, 1) if avg_days else 0
+        avg_days = average_processing_days(
+            cases.filter(Case.status.in_(["Approved", "Rejected"]))
+        )
         result.append({
             "officer_id": officer.id,
             "full_name": officer.full_name,
